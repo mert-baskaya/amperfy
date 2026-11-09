@@ -118,4 +118,48 @@ class SettingsTest: XCTestCase {
     XCTAssertTrue(reread.isLibrarySynced)
     XCTAssertEqual(reread.librarySyncVersion, AppSettings().librarySyncVersion)
   }
+
+  func testAccountSettingPlayQueueSyncIsOffByDefault() {
+    let setting = AccountSetting()
+    XCTAssertFalse(setting.isPlayQueueSyncEnabled)
+    XCTAssertNil(setting.knownServerPlayQueueChanged)
+    XCTAssertNil(setting.savedPlayQueueMark)
+  }
+
+  func testAccountSettingWithoutPlayQueueSyncDecodes() throws {
+    // AccountSettings decodes without defaults for missing fields: a new field must be optional
+    var setting = AccountSetting()
+    setting.isScrobbleStreamedItems = true
+    setting.isPlayQueueSyncEnabled = true
+    setting.knownServerPlayQueueChanged = "2026-11-09T18:01:02.123456789Z"
+    setting.savedPlayQueueMark = "id@1000"
+    let data = try JSONEncoder().encode(setting)
+    var object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    for key in ["_isPlayQueueSyncEnabled", "_knownServerPlayQueueChanged", "_savedPlayQueueMark"] {
+      XCTAssertNotNil(object.removeValue(forKey: key))
+    }
+
+    let decoded = try JSONDecoder().decode(
+      AccountSetting.self,
+      from: JSONSerialization.data(withJSONObject: object)
+    )
+    XCTAssertTrue(decoded.isScrobbleStreamedItems)
+    XCTAssertFalse(decoded.isPlayQueueSyncEnabled)
+    XCTAssertNil(decoded.knownServerPlayQueueChanged)
+    XCTAssertNil(decoded.savedPlayQueueMark)
+  }
+
+  func testAccountSettingPlayQueueSyncRoundTrip() throws {
+    var setting = AccountSetting()
+    setting.isPlayQueueSyncEnabled = true
+    setting.knownServerPlayQueueChanged = "2026-11-09T18:01:02.123456789Z"
+    setting.savedPlayQueueMark = "id@1000"
+    let decoded = try JSONDecoder().decode(
+      AccountSetting.self,
+      from: JSONEncoder().encode(setting)
+    )
+    XCTAssertTrue(decoded.isPlayQueueSyncEnabled)
+    XCTAssertEqual(decoded.knownServerPlayQueueChanged, "2026-11-09T18:01:02.123456789Z")
+    XCTAssertEqual(decoded.savedPlayQueueMark, "id@1000")
+  }
 }

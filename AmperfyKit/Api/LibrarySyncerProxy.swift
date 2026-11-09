@@ -228,4 +228,14 @@ extension LibrarySyncerProxy: LibrarySyncer {
   func parseLyrics(relFilePath: URL) async throws -> LyricsList {
     try await activeSyncer.parseLyrics(relFilePath: relFilePath)
   }
+
+  @MainActor
+  func syncDownPlayQueue() async throws -> RemotePlayQueue? {
+    try await activeSyncer.syncDownPlayQueue()
+  }
+
+  @MainActor
+  func syncUpload(playQueue: PlayQueueUpload) async throws {
+    try await activeSyncer.syncUpload(playQueue: playQueue)
+  }
 }

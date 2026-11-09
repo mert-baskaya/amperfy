@@ -270,6 +270,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     configureBatteryMonitoring()
     configureBackgroundFetch()
     configureNotificationHandling()
+    configurePlayQueueHandoff()
     initEventLogger()
 
     guard let activeAccountInfo = appDelegate.storage.settings.accounts.active else {

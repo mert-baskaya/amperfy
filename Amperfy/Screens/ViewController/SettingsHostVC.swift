@@ -304,6 +304,13 @@ class SettingsHostVC: UIViewController {
           accountSettings.isScrobbleStreamedItems = newValue
         }
     }))
+    changesAgent.append(settings.$isPlayQueueSyncEnabled.sink(receiveValue: { newValue in
+      guard let activeAccountInfo = self.settings.activeAccountInfo else { return }
+      self.appDelegate.storage.settings.accounts
+        .updateSetting(activeAccountInfo) { accountSettings in
+          accountSettings.isPlayQueueSyncEnabled = newValue
+        }
+    }))
   }
 
   // account is changed via the active account changed callback
@@ -326,6 +333,10 @@ class SettingsHostVC: UIViewController {
     settings.isScrobbleStreamedItems = appDelegate.storage.settings.accounts
       .getSetting(accountInfo).read
       .isScrobbleStreamedItems
+
+    settings.isPlayQueueSyncEnabled = appDelegate.storage.settings.accounts
+      .getSetting(accountInfo).read
+      .isPlayQueueSyncEnabled
   }
 
   @IBSegueAction

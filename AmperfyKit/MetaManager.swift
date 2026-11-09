@@ -126,6 +126,22 @@ public class MetaManager {
     return scrobbleSyncer!
   }
 
+  public private(set) var playQueueSyncer: PlayQueueSyncer?
+  internal func createPlayQueueSyncer(player: PlayerFacade) -> PlayQueueSyncer {
+    if let playQueueSyncer { return playQueueSyncer }
+    let syncer = PlayQueueSyncer(
+      player: player,
+      account: account,
+      storage: storage,
+      networkMonitor: networkMonitor,
+      librarySyncer: librarySyncer,
+      eventLogger: eventLogger,
+      notificationHandler: notificationHandler
+    )
+    playQueueSyncer = syncer
+    return syncer
+  }
+
   public lazy var playableDownloadManager: DownloadManageable = {
     let getDownloadDelegateCB = { @MainActor in
       return self.playableDownloadDelegate
@@ -284,6 +300,9 @@ public class MetaManager {
     backgroundLibrarySyncer.start()
     let scrobbler = createScrobbleSyncer(player: player)
     player.addNotifier(notifier: scrobbler)
+    let playQueueSyncer = createPlayQueueSyncer(player: player)
+    player.addNotifier(notifier: playQueueSyncer)
+    playQueueSyncer.start()
   }
 
   public func startManagerForNormalOperation(player: PlayerFacade) {
@@ -295,12 +314,17 @@ public class MetaManager {
     let scrobbler = createScrobbleSyncer(player: player)
     player.addNotifier(notifier: scrobbler)
     scrobbler.start()
+    let playQueueSyncer = createPlayQueueSyncer(player: player)
+    player.addNotifier(notifier: playQueueSyncer)
+    playQueueSyncer.start()
   }
 
   public func stopManager() {
     os_log("Start meta managers", log: self.log, type: .info)
     scrobbleSyncer?.stop()
     scrobbleSyncer = nil
+    playQueueSyncer?.stop()
+    playQueueSyncer = nil
     backgroundLibrarySyncer.stop()
     artworkDownloadManager.stop()
     playableDownloadManager.stop()

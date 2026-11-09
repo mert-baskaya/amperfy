@@ -408,6 +408,80 @@ public protocol LibrarySyncer: Sendable {
   func setFavorite(artist: Artist, isFavorite: Bool) async throws
   @MainActor
   func parseLyrics(relFilePath: URL) async throws -> LyricsList
+  @MainActor
+  func syncDownPlayQueue() async throws -> RemotePlayQueue?
+  @MainActor
+  func syncUpload(playQueue: PlayQueueUpload) async throws
+}
+
+// MARK: - PlayQueueUpload
+
+/// The music queue in the order it plays, as it goes to the server
+public struct PlayQueueUpload: Equatable, Sendable {
+  public let songIds: [String]
+  public let currentIndex: Int
+  public let positionMs: Int
+
+  public init(songIds: [String], currentIndex: Int, positionMs: Int) {
+    self.songIds = songIds
+    self.currentIndex = currentIndex
+    self.positionMs = positionMs
+  }
+
+  public var currentSongId: String {
+    songIds[currentIndex]
+  }
+
+  /// Identifies a saved queue when it comes back from the server
+  public var mark: String {
+    "\(currentSongId)@\(positionMs)"
+  }
+
+  /// A part of at most `maxCount` songs that contains the current song
+  public func window(maxCount: Int) -> PlayQueueUpload {
+    let window = PlayContext.window(count: songIds.count, index: currentIndex, maxCount: maxCount)
+    return PlayQueueUpload(
+      songIds: Array(songIds[window.range]),
+      currentIndex: window.index,
+      positionMs: positionMs
+    )
+  }
+}
+
+// MARK: - RemotePlayQueue
+
+/// The play queue that a client saved on the server
+public struct RemotePlayQueue {
+  public let songs: [Song]
+  public let currentIndex: Int
+  public let positionMs: Int
+  /// The time of the save, as the server sends it
+  public let changed: String
+  /// The client that saved the queue
+  public let changedBy: String
+
+  public init(
+    songs: [Song],
+    currentIndex: Int,
+    positionMs: Int,
+    changed: String,
+    changedBy: String
+  ) {
+    self.songs = songs
+    self.currentIndex = currentIndex
+    self.positionMs = positionMs
+    self.changed = changed
+    self.changedBy = changedBy
+  }
+
+  public var currentSong: Song? {
+    songs.indices.contains(currentIndex) ? songs[currentIndex] : nil
+  }
+
+  public var mark: String? {
+    guard let currentSong else { return nil }
+    return "\(currentSong.id)@\(positionMs)"
+  }
 }
 
 // MARK: - AbstractBackgroundLibrarySyncer

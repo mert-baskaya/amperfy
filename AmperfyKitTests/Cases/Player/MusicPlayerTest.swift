@@ -185,6 +185,18 @@ final class MOCK_LibrarySyncer: LibrarySyncer {
   func setFavorite(album: Album, isFavorite: Bool) async throws {}
   func setFavorite(artist: Artist, isFavorite: Bool) async throws {}
   func parseLyrics(relFilePath: URL) async throws -> LyricsList { LyricsList() }
+
+  nonisolated(unsafe) var remotePlayQueue: RemotePlayQueue?
+  nonisolated(unsafe) var remotePlayQueueRequestCount = 0
+  nonisolated(unsafe) var uploadedPlayQueues = [PlayQueueUpload]()
+  func syncDownPlayQueue() async throws -> RemotePlayQueue? {
+    remotePlayQueueRequestCount += 1
+    return remotePlayQueue
+  }
+
+  func syncUpload(playQueue: PlayQueueUpload) async throws {
+    uploadedPlayQueues.append(playQueue)
+  }
 }
 
 // MARK: - MOCK_DownloadManagerDelegate

@@ -1431,6 +1431,16 @@ class AmpacheLibrarySyncer: CommonLibrarySyncer, LibrarySyncer {
     throw ResponseError(type: .xml, cleansedURL: nil, data: nil)
   }
 
+  @MainActor
+  func syncDownPlayQueue() async throws -> RemotePlayQueue? {
+    throw BackendError.notSupported
+  }
+
+  @MainActor
+  func syncUpload(playQueue: PlayQueueUpload) async throws {
+    throw BackendError.notSupported
+  }
+
   private func parseForError(response: APIDataResponse) throws {
     let parserDelegate = AmpacheXmlParser(performanceMonitor: performanceMonitor)
     try parse(response: response, delegate: parserDelegate)

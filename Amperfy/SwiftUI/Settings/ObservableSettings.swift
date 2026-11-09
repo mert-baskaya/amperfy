@@ -59,6 +59,8 @@ final class Settings: ObservableObject {
   @Published
   var isScrobbleStreamedItems = false
   @Published
+  var isPlayQueueSyncEnabled = false
+  @Published
   var isPlaybackStartOnlyOnPlay = false
   @Published
   var isPlayerSongPlaybackResumeEnabled = false

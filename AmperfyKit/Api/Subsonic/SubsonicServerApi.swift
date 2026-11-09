@@ -65,6 +65,8 @@ extension ResponseError {
 // MARK: - OpenSubsonicExtension
 
 enum OpenSubsonicExtension: String {
+  case formPost
+  case indexBasedQueue
   case songLyrics
   case transcodeOffset
 }
@@ -815,6 +817,67 @@ final class SubsonicServerApi: URLCleanser, Sendable {
     }
   }
 
+  public func requestPlayQueue() async throws -> APIDataResponse {
+    try await request { version in
+      let urlComp = try self.createAuthApiUrlComponent(version: version, forAction: "getPlayQueue")
+      return try self.createUrl(from: urlComp)
+    }
+  }
+
+  /// this requires that the server supports OpenSubsonicExtension "indexBasedQueue"
+  public func requestPlayQueueByIndex() async throws -> APIDataResponse {
+    try await request { version in
+      let urlComp = try self.createAuthApiUrlComponent(
+        version: version,
+        forAction: "getPlayQueueByIndex"
+      )
+      return try self.createUrl(from: urlComp)
+    }
+  }
+
+  /// An empty `ids` list clears the play queue on the server
+  /// `isFormPost` requires that the server supports OpenSubsonicExtension "formPost"
+  public func requestSavePlayQueue(
+    ids: [String],
+    currentId: String,
+    positionMs: Int,
+    isFormPost: Bool
+  ) async throws
+    -> APIDataResponse {
+    try await request(isFormPost: isFormPost) { version in
+      var urlComp = try self.createAuthApiUrlComponent(version: version, forAction: "savePlayQueue")
+      for id in ids {
+        urlComp.addQueryItem(name: "id", value: id)
+      }
+      urlComp.addQueryItem(name: "current", value: currentId)
+      urlComp.addQueryItem(name: "position", value: positionMs)
+      return try self.createUrl(from: urlComp)
+    }
+  }
+
+  /// this requires that the server supports OpenSubsonicExtension "indexBasedQueue"
+  /// `isFormPost` requires that the server supports OpenSubsonicExtension "formPost"
+  public func requestSavePlayQueueByIndex(
+    ids: [String],
+    currentIndex: Int,
+    positionMs: Int,
+    isFormPost: Bool
+  ) async throws
+    -> APIDataResponse {
+    try await request(isFormPost: isFormPost) { version in
+      var urlComp = try self.createAuthApiUrlComponent(
+        version: version,
+        forAction: "savePlayQueueByIndex"
+      )
+      for id in ids {
+        urlComp.addQueryItem(name: "id", value: id)
+      }
+      urlComp.addQueryItem(name: "currentIndex", value: currentIndex)
+      urlComp.addQueryItem(name: "position", value: positionMs)
+      return try self.createUrl(from: urlComp)
+    }
+  }
+
   public func requestPodcasts() async throws -> APIDataResponse {
     try await request { version in
       var urlComp = try self.createAuthApiUrlComponent(version: version, forAction: "getPodcasts")
@@ -982,16 +1045,50 @@ final class SubsonicServerApi: URLCleanser, Sendable {
     }
   }
 
-  private func request(urlCreation: @escaping (_: SubsonicVersion) throws -> URL) async throws
+  private func request(
+    isFormPost: Bool = false,
+    urlCreation: @escaping (_: SubsonicVersion) throws -> URL
+  ) async throws
     -> APIDataResponse {
     let version = try await determineApiVersionToUse()
     let url = try urlCreation(version)
-    return try await request(url: url, headers: buildHTTPHeaders())
+    guard isFormPost else {
+      return try await request(url: url, headers: buildHTTPHeaders())
+    }
+    // the parameters go into the body, so a long list of ids does not make the URL too long
+    guard var urlComp = URLComponents(url: url, resolvingAgainstBaseURL: false)
+    else { throw BackendError.invalidUrl }
+    let formParameters = Dictionary(grouping: urlComp.queryItems ?? [], by: \.name)
+      .mapValues { items in items.map { $0.value ?? "" } }
+    urlComp.queryItems = nil
+    return try await request(
+      url: try createUrl(from: urlComp),
+      headers: buildHTTPHeaders(),
+      formParameters: formParameters
+    )
   }
 
-  private func request(url: URL, headers: HTTPHeaders? = nil) async throws -> APIDataResponse {
+  private func request(
+    url: URL,
+    headers: HTTPHeaders? = nil,
+    formParameters: [String: [String]]? = nil
+  ) async throws
+    -> APIDataResponse {
     try await withUnsafeThrowingContinuation { continuation in
-      let afRequest = AF.request(url, method: .get, headers: headers)
+      let afRequest = if let formParameters {
+        AF.request(
+          url,
+          method: .post,
+          parameters: formParameters,
+          encoder: URLEncodedFormParameterEncoder(
+            encoder: URLEncodedFormEncoder(arrayEncoding: .noBrackets),
+            destination: .httpBody
+          ),
+          headers: headers
+        )
+      } else {
+        AF.request(url, method: .get, headers: headers)
+      }
       afRequest.validate().responseData { response in
         if response.response?.statusCode == 404 {
           let cleanedURL = self.cleanse(url: response.request?.url)

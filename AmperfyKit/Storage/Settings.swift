@@ -386,6 +386,27 @@ public struct AccountSetting: Sendable, Codable {
     set { _isScrobbleStreamedItems = newValue }
   }
 
+  // optional: account settings stored before this property existed must still decode
+  private var _isPlayQueueSyncEnabled: Bool?
+  public var isPlayQueueSyncEnabled: Bool {
+    get { _isPlayQueueSyncEnabled ?? false }
+    set { _isPlayQueueSyncEnabled = newValue }
+  }
+
+  // `changed` of the last server play queue that this device restored, dismissed or saved itself
+  private var _knownServerPlayQueueChanged: String?
+  public var knownServerPlayQueueChanged: String? {
+    get { _knownServerPlayQueueChanged }
+    set { _knownServerPlayQueueChanged = newValue }
+  }
+
+  // `PlayQueueUpload.mark` of the last play queue that this device saved
+  private var _savedPlayQueueMark: String?
+  public var savedPlayQueueMark: String? {
+    get { _savedPlayQueueMark }
+    set { _savedPlayQueueMark = newValue }
+  }
+
   private var _libraryDisplaySettings: LibraryDisplaySettings = .defaultSettings
   public var libraryDisplaySettings: LibraryDisplaySettings {
     get { _libraryDisplaySettings }

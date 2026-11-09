@@ -1,0 +1,53 @@
+<subsonic-response xmlns="http://subsonic.org/restapi" status="ok" version="1.16.1" type="navidrome" serverVersion="0.64.2 (10114574)" openSubsonic="true">
+  <playQueueByIndex currentIndex="0" username="mert" changed="2026-11-09T14:48:08.284026245Z" changedBy="Feishin">
+    <entry id="3p3V5tsCsltVIhPGUP1N9a" parent="3XcVSSPxAWVJ65IejHmool" isDir="false" title="Enjoy the Silence" album="The Singles 86&gt;98" artist="Depeche Mode" track="8" year="1998" genre="Alternative Dance" coverArt="mf-3p3V5tsCsltVIhPGUP1N9a_97b8a6197619fe48" size="33351874" contentType="audio/flac" suffix="flac" duration="256" bitRate="1038" path="Depeche Mode/The Singles 86&gt;98/01-08 - Enjoy the Silence.flac" discNumber="1" created="2026-10-23T19:31:00.557258123Z" albumId="3XcVSSPxAWVJ65IejHmool" artistId="1kwTBRxar6z713PUMy3P1g" type="music" comment="Digital" sortName="enjoy the silence" mediaType="song" musicBrainzId="8caee4aa-bc6e-454d-b8ab-16695a398c75" channelCount="2" samplingRate="44100" bitDepth="16" displayArtist="Depeche Mode" displayAlbumArtist="Depeche Mode">
+      <isrc>GBAJH9800146</isrc>
+      <genres name="Alternative Dance"/>
+      <genres name="Synth-Pop"/>
+      <genres name="Electronic"/>
+      <artists id="1kwTBRxar6z713PUMy3P1g" name="Depeche Mode"/>
+      <albumArtists id="1kwTBRxar6z713PUMy3P1g" name="Depeche Mode"/>
+    </entry>
+    <entry id="4hqrVF0Lo9pM5iUG5OCSTB" parent="3Kxvn9PlIiLzwjXQmi3j8c" isDir="false" title="It's No Good" album="Ultra" artist="Depeche Mode" track="4" year="1997" genre="Alternative Rock" coverArt="mf-4hqrVF0Lo9pM5iUG5OCSTB_56cf361f60de3009" size="45637754" contentType="audio/flac" suffix="flac" duration="358" bitRate="1010" path="Depeche Mode/Ultra/01-04 - It's No Good.flac" discNumber="1" created="2026-10-23T19:30:22.896726832Z" albumId="3Kxvn9PlIiLzwjXQmi3j8c" artistId="1kwTBRxar6z713PUMy3P1g" type="music" comment="Digital" sortName="it's no good" mediaType="song" musicBrainzId="6b2a7ad3-7bee-43ca-9c5c-689c3c43dea1" channelCount="2" samplingRate="44100" bitDepth="16" displayArtist="Depeche Mode" displayAlbumArtist="Depeche Mode" displayComposer="Martin L.Gore">
+      <isrc>GBAJH0602714</isrc>
+      <genres name="Alternative Rock"/>
+      <genres name="Electronic"/>
+      <genres name="Downtempo"/>
+      <genres name="Alternative Dance"/>
+      <genres name="Pop"/>
+      <genres name="Rock"/>
+      <genres name="Synth-Pop"/>
+      <artists id="1kwTBRxar6z713PUMy3P1g" name="Depeche Mode"/>
+      <albumArtists id="1kwTBRxar6z713PUMy3P1g" name="Depeche Mode"/>
+      <contributors role="composer">
+        <artist id="20bfaGJ2MGyrkZAupLO4E2" name="Martin L.Gore"/>
+      </contributors>
+      <contributors role="producer">
+        <artist id="0MLQzGRWlNsyNxraVPeWCv" name="Tim Simenon"/>
+      </contributors>
+    </entry>
+    <entry id="3f3WnQLOUnHCo1E7VwGQUg" parent="6MZlgD0GGO0E9rKIoq3xdC" isDir="false" title="Strangelove" album="The Best of Depeche Mode, Volume 1" artist="Depeche Mode" track="8" year="2006" genre="Alternative Dance" coverArt="mf-3f3WnQLOUnHCo1E7VwGQUg_ef195db8102a69d1" size="27538737" contentType="audio/flac" suffix="flac" duration="226" bitRate="969" path="Depeche Mode/The Best of Depeche Mode, Volume 1/01-08 - Strangelove.flac" discNumber="1" created="2026-10-23T19:30:22.869741554Z" albumId="6MZlgD0GGO0E9rKIoq3xdC" artistId="1kwTBRxar6z713PUMy3P1g" type="music" sortName="strangelove" mediaType="song" musicBrainzId="9cea9035-4e3e-473e-abf3-f31d0c2c61e4" channelCount="2" samplingRate="44100" bitDepth="16" displayArtist="Depeche Mode" displayAlbumArtist="Depeche Mode">
+      <genres name="Alternative Dance"/>
+      <genres name="New Wave"/>
+      <genres name="Synth-Pop"/>
+      <genres name="Pop"/>
+      <genres name="Dance-Rock"/>
+      <genres name="Electronic"/>
+      <genres name="New Romantic"/>
+      <genres name="Downtempo"/>
+      <genres name="Rock"/>
+      <genres name="Blues"/>
+      <genres name="Alternative Rock"/>
+      <artists id="1kwTBRxar6z713PUMy3P1g" name="Depeche Mode"/>
+      <albumArtists id="1kwTBRxar6z713PUMy3P1g" name="Depeche Mode"/>
+    </entry>
+    <entry id="61lntTfaWaQoIofKFdJPg3" parent="3XcVSSPxAWVJ65IejHmool" isDir="false" title="Personal Jesus" album="The Singles 86&gt;98" artist="Depeche Mode" track="7" year="1998" genre="Alternative Dance" coverArt="mf-61lntTfaWaQoIofKFdJPg3_97b8a6197619fe48" size="27667281" contentType="audio/flac" suffix="flac" duration="226" bitRate="976" path="Depeche Mode/The Singles 86&gt;98/01-07 - Personal Jesus.flac" discNumber="1" created="2026-10-23T19:31:00.561440946Z" albumId="3XcVSSPxAWVJ65IejHmool" artistId="1kwTBRxar6z713PUMy3P1g" type="music" comment="Digital" sortName="personal jesus" mediaType="song" musicBrainzId="72cbbcdd-4b3a-41b8-92d6-0fa13888f00d" channelCount="2" samplingRate="44100" bitDepth="16" displayArtist="Depeche Mode" displayAlbumArtist="Depeche Mode">
+      <isrc>GBAJH9800145</isrc>
+      <genres name="Alternative Dance"/>
+      <genres name="Synth-Pop"/>
+      <genres name="Electronic"/>
+      <artists id="1kwTBRxar6z713PUMy3P1g" name="Depeche Mode"/>
+      <albumArtists id="1kwTBRxar6z713PUMy3P1g" name="Depeche Mode"/>
+    </entry>
+  </playQueueByIndex>
+</subsonic-response>

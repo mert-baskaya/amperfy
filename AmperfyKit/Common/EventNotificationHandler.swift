@@ -33,6 +33,9 @@ extension Notification.Name {
   public static let playerPlay = Notification.Name(rawValue: "de.amperfy.player.play")
   public static let playerPause = Notification.Name(rawValue: "de.amperfy.player.pause")
   public static let playerStop = Notification.Name(rawValue: "de.amperfy.player.stop")
+  // posted by PlayQueueSyncer, the RemotePlayQueue is in userInfo
+  public static let remotePlayQueueAvailable = Notification
+    .Name(rawValue: "de.amperfy.player.remotePlayQueue.available")
   public static let fetchControllerSortChanged = Notification
     .Name(rawValue: "de.amperfy.fetchController.sort.change")
   public static let offlineModeChanged = Notification

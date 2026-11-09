@@ -205,6 +205,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
     appDelegate.quickActionsManager.handleSavedShortCutItemIfSaved()
     appDelegate.rebuildMainMenu()
+    appDelegate.checkRemotePlayQueue()
   }
 
   func sceneWillResignActive(_ scene: UIScene) {
@@ -236,6 +237,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
       return
     }
     appDelegate.scheduleAppRefresh()
+    appDelegate.savePlayQueuesBeforeSuspension()
   }
 
   func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {

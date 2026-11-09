@@ -23,10 +23,14 @@ import CoreData
 import Foundation
 import os.log
 
+// MARK: - SubsonicLibrarySyncer
+
 class SubsonicLibrarySyncer: CommonLibrarySyncer, LibrarySyncer {
   private let subsonicServerApi: SubsonicServerApi
 
   private static let maxItemCountToPollAtOnce: Int = 500
+  /// Keeps a GET request of `savePlayQueue` below common URL length limits of proxies
+  private static let maxPlayQueueCountInUrl: Int = 200
 
   init(
     subsonicServerApi: SubsonicServerApi,
@@ -1173,6 +1177,101 @@ class SubsonicLibrarySyncer: CommonLibrarySyncer, LibrarySyncer {
   }
 
   @MainActor
+  func syncDownPlayQueue() async throws -> RemotePlayQueue? {
+    guard isSyncAllowed else { return nil }
+    do {
+      return try await requestRemotePlayQueue()
+    } catch let error as ResponseError where error.asSubsonicError == .requestedDataNotFound {
+      return nil // no client has saved a play queue yet
+    }
+  }
+
+  @MainActor
+  private func requestRemotePlayQueue() async throws -> RemotePlayQueue? {
+    let isIndexBased = await subsonicServerApi
+      .isOpenSubsonicExtensionSupported(extension: .indexBasedQueue)
+    let response = if isIndexBased {
+      try await subsonicServerApi.requestPlayQueueByIndex()
+    } else {
+      try await subsonicServerApi.requestPlayQueue()
+    }
+
+    let parsed: ParsedPlayQueue? = try await storage.async.performAndGet { asyncCompanion in
+      let accountAsync = asyncCompanion.library.getAccount(managedObjectId: self.accountObjectId)
+      let idParserDelegate = SsIDsParserDelegate(performanceMonitor: self.performanceMonitor)
+      try self.parse(
+        response: response,
+        delegate: idParserDelegate,
+        isThrowingErrorsAllowed: false
+      )
+      let prefetch = asyncCompanion.library.getElements(
+        account: accountAsync,
+        prefetchIDs: idParserDelegate.prefetchIDs
+      )
+      let parserDelegate = SsPlayQueueParserDelegate(
+        performanceMonitor: self.performanceMonitor,
+        prefetch: prefetch,
+        account: accountAsync,
+        library: asyncCompanion.library
+      )
+      try self.parse(response: response, delegate: parserDelegate)
+      guard !parserDelegate.parsedSongs.isEmpty else { return nil }
+      return ParsedPlayQueue(
+        songObjectIds: try asyncCompanion.getPermanentObjectIDs(of: parserDelegate.parsedSongs),
+        currentIndex: parserDelegate.currentIndex,
+        positionMs: parserDelegate.positionMs,
+        changed: parserDelegate.changed,
+        changedBy: parserDelegate.changedBy
+      )
+    }
+    guard let parsed else { return nil }
+    return RemotePlayQueue(
+      songs: try parsed.songObjectIds.map {
+        Song(managedObject: try storage.main.context.existingObject(with: $0) as! SongMO)
+      },
+      currentIndex: parsed.currentIndex,
+      positionMs: parsed.positionMs,
+      changed: parsed.changed,
+      changedBy: parsed.changedBy
+    )
+  }
+
+  @MainActor
+  func syncUpload(playQueue: PlayQueueUpload) async throws {
+    // an empty queue would clear the queue on the server
+    guard isSyncAllowed, playQueue.songIds.indices.contains(playQueue.currentIndex)
+    else { return }
+    let isFormPost = await subsonicServerApi.isOpenSubsonicExtensionSupported(extension: .formPost)
+    let queue = isFormPost ? playQueue : playQueue
+      .window(maxCount: Self.maxPlayQueueCountInUrl)
+    os_log(
+      "Upload play queue: %i songs, current %i at %i ms",
+      log: log,
+      type: .info,
+      queue.songIds.count,
+      queue.currentIndex,
+      queue.positionMs
+    )
+    let response: APIDataResponse
+    if await subsonicServerApi.isOpenSubsonicExtensionSupported(extension: .indexBasedQueue) {
+      response = try await subsonicServerApi.requestSavePlayQueueByIndex(
+        ids: queue.songIds,
+        currentIndex: queue.currentIndex,
+        positionMs: queue.positionMs,
+        isFormPost: isFormPost
+      )
+    } else {
+      response = try await subsonicServerApi.requestSavePlayQueue(
+        ids: queue.songIds,
+        currentId: queue.currentSongId,
+        positionMs: queue.positionMs,
+        isFormPost: isFormPost
+      )
+    }
+    try parseForError(response: response)
+  }
+
+  @MainActor
   func setRating(song: Song, rating: Int) async throws {
     guard isSyncAllowed, rating >= 0, rating <= 5 else { return }
     os_log("Rate %i stars: %s", log: log, type: .info, rating, song.displayString)
@@ -1454,4 +1553,14 @@ class SubsonicLibrarySyncer: CommonLibrarySyncer, LibrarySyncer {
       throw ResponseError(type: .xml)
     }
   }
+}
+
+// MARK: - ParsedPlayQueue
+
+private struct ParsedPlayQueue: Sendable {
+  let songObjectIds: [NSManagedObjectID]
+  let currentIndex: Int
+  let positionMs: Int
+  let changed: String
+  let changedBy: String
 }

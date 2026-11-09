@@ -204,6 +204,20 @@ struct AccountSettingsView: View {
             footer: "Enable to scrobble all streamed songs, even if the server already marks them as played."
           )
 
+          if let credentials = appDelegate.storage.settings.accounts.getSetting(activeAccountInfo)
+            .read.loginCredentials,
+            credentials.backendApi.asServerApiType != .ampache {
+            SettingsSection(
+              content: {
+                SettingsCheckBoxRow(
+                  title: "Sync Play Queue with Server",
+                  isOn: $settings.isPlayQueueSyncEnabled
+                )
+              },
+              footer: "Save the music queue and its position to the server when playback pauses or Amperfy goes to the background. Offer to continue a queue that another client or another device saved."
+            )
+          }
+
           SettingsSection {
             SettingsRow(title: "Backend API", splitPercentage: splitPercentage) {
               Text(
