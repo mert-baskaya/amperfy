@@ -1055,37 +1055,39 @@ final class SubsonicServerApi: URLCleanser, Sendable {
     guard isFormPost else {
       return try await request(url: url, headers: buildHTTPHeaders())
     }
-    // the parameters go into the body, so a long list of ids does not make the URL too long
+    let formPostRequest = try Self.createFormPostRequest(url: url, headers: buildHTTPHeaders())
+    return try await request(url: formPostRequest.url ?? url, formPostRequest: formPostRequest)
+  }
+
+  /// Moves the query of `url` into the body (OpenSubsonic "formPost"), so a long list of ids does
+  /// not make the URL too long. Repeated parameters keep their order: the order of `id` is the
+  /// order of a play queue.
+  static func createFormPostRequest(url: URL, headers: HTTPHeaders?) throws -> URLRequest {
     guard var urlComp = URLComponents(url: url, resolvingAgainstBaseURL: false)
     else { throw BackendError.invalidUrl }
-    let formParameters = Dictionary(grouping: urlComp.queryItems ?? [], by: \.name)
+    let parameters = Dictionary(grouping: urlComp.queryItems ?? [], by: \.name)
       .mapValues { items in items.map { $0.value ?? "" } }
     urlComp.queryItems = nil
-    return try await request(
-      url: try createUrl(from: urlComp),
-      headers: buildHTTPHeaders(),
-      formParameters: formParameters
+    guard let postUrl = urlComp.url else { throw BackendError.invalidUrl }
+    let encoder = URLEncodedFormParameterEncoder(
+      encoder: URLEncodedFormEncoder(alphabetizeKeyValuePairs: false, arrayEncoding: .noBrackets),
+      destination: .httpBody
+    )
+    return try encoder.encode(
+      parameters,
+      into: URLRequest(url: postUrl, method: .post, headers: headers)
     )
   }
 
   private func request(
     url: URL,
     headers: HTTPHeaders? = nil,
-    formParameters: [String: [String]]? = nil
+    formPostRequest: URLRequest? = nil
   ) async throws
     -> APIDataResponse {
     try await withUnsafeThrowingContinuation { continuation in
-      let afRequest = if let formParameters {
-        AF.request(
-          url,
-          method: .post,
-          parameters: formParameters,
-          encoder: URLEncodedFormParameterEncoder(
-            encoder: URLEncodedFormEncoder(arrayEncoding: .noBrackets),
-            destination: .httpBody
-          ),
-          headers: headers
-        )
+      let afRequest = if let formPostRequest {
+        AF.request(formPostRequest)
       } else {
         AF.request(url, method: .get, headers: headers)
       }

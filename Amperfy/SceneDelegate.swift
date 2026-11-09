@@ -205,7 +205,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
     appDelegate.quickActionsManager.handleSavedShortCutItemIfSaved()
     appDelegate.rebuildMainMenu()
-    appDelegate.checkRemotePlayQueue()
+    appDelegate.checkRemotePlayQueue(isEnteringForeground: false)
   }
 
   func sceneWillResignActive(_ scene: UIScene) {
@@ -223,6 +223,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     // Use this method to undo the changes made on entering the background.
     os_log("sceneWillEnterForeground", log: self.log, type: .info)
     AmperKit.shared.threadPerformanceMonitor.isInForeground = true
+    guard appDelegate.isNormalInteraction else {
+      return
+    }
+    appDelegate.checkRemotePlayQueue(isEnteringForeground: true)
   }
 
   func sceneDidEnterBackground(_ scene: UIScene) {

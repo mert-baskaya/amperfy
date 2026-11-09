@@ -53,12 +53,13 @@ extension AppDelegate {
     )
   }
 
-  /// Offers the server play queue of the active account, if another client saved a new one
-  func checkRemotePlayQueue() {
+  /// Offers the server play queue of the active account, if another client saved a new one.
+  /// When the scene only becomes active again, the check waits for the minimum interval.
+  func checkRemotePlayQueue(isEnteringForeground: Bool) {
     guard let activeAccountInfo = storage.settings.accounts.active,
           let syncer = getMeta(activeAccountInfo).playQueueSyncer
     else { return }
-    Task { await syncer.checkRemoteQueue() }
+    Task { await syncer.checkRemoteQueue(isIntervalIgnored: isEnteringForeground) }
   }
 
   /// Saves the play queue of each account before iOS suspends Amperfy
@@ -80,17 +81,33 @@ extension AppDelegate {
           let remote = notification
           .userInfo?[PlayQueueSyncer.remotePlayQueueKey] as? RemotePlayQueue
     else { return }
-    offerToContinue(remote, syncer: syncer, isRetry: false)
+    offerToContinue(remote, syncer: syncer, retryCount: 0)
   }
 
-  private func offerToContinue(_ remote: RemotePlayQueue, syncer: PlayQueueSyncer, isRetry: Bool) {
+  /// The top view controller, also a presented one such as the player or a settings sheet
+  private static var playQueueAlertPresenter: UIViewController? {
+    var presenter = window?.rootViewController
+    while let presented = presenter?.presentedViewController, !presented.isBeingDismissed {
+      presenter = presented
+    }
+    guard let presenter, !(presenter is UIAlertController), !presenter.isBeingDismissed,
+          presenter.viewIfLoaded?.window != nil
+    else { return nil }
+    return presenter
+  }
+
+  private func offerToContinue(
+    _ remote: RemotePlayQueue,
+    syncer: PlayQueueSyncer,
+    retryCount: Int
+  ) {
     guard Self.remotePlayQueueAlert == nil else { return }
-    guard let topView = Self.topViewController(), topView.presentedViewController == nil else {
-      // the main window is not ready right after launch
-      guard !isRetry else { return }
+    guard let presenter = Self.playQueueAlertPresenter else {
+      // right after launch the main window is not ready, or another alert is open
+      guard retryCount < 5 else { return }
       Task {
         try? await Task.sleep(nanoseconds: 1_000_000_000)
-        offerToContinue(remote, syncer: syncer, isRetry: true)
+        offerToContinue(remote, syncer: syncer, retryCount: retryCount + 1)
       }
       return
     }
@@ -119,6 +136,6 @@ extension AppDelegate {
     alert.addAction(continueAction)
     alert.preferredAction = continueAction
     Self.remotePlayQueueAlert = alert
-    topView.present(alert, animated: true)
+    presenter.present(alert, animated: true)
   }
 }

@@ -202,3 +202,27 @@ class SsPlayQueueByIndexExample3ParserTest: AbstractSsParserTest {
     XCTAssertEqual(parser.changedBy, "")
   }
 }
+
+// MARK: - PlayQueueFormPostTest
+
+class PlayQueueFormPostTest: XCTestCase {
+  func testFormPostRequest_KeepsOrderOfQueue() throws {
+    let url = try XCTUnwrap(URL(
+      string: "https://music.example.org/rest/savePlayQueueByIndex.view?u=user&t=token&s=salt&v=1.13.0&c=Amperfy&id=c3&id=a1&id=b2&id=a1&currentIndex=3&position=12345"
+    ))
+    let request = try SubsonicServerApi.createFormPostRequest(url: url, headers: nil)
+
+    XCTAssertEqual(request.httpMethod, "POST")
+    XCTAssertEqual(
+      request.url?.absoluteString,
+      "https://music.example.org/rest/savePlayQueueByIndex.view"
+    )
+    let body = String(decoding: try XCTUnwrap(request.httpBody), as: UTF8.self)
+    let pairs = body.split(separator: "&").map { String($0) }
+    XCTAssertEqual(pairs.filter { $0.hasPrefix("id=") }, ["id=c3", "id=a1", "id=b2", "id=a1"])
+    XCTAssertTrue(pairs.contains("currentIndex=3"))
+    XCTAssertTrue(pairs.contains("position=12345"))
+    XCTAssertTrue(pairs.contains("u=user"))
+    XCTAssertTrue(pairs.contains("c=Amperfy"))
+  }
+}

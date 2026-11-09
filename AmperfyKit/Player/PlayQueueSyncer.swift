@@ -43,7 +43,8 @@ public class PlayQueueSyncer {
   public var debounceDelay: TimeInterval = 3
   /// Seconds to wait after a pause. A new queue starts with a pause, its queue change then wins.
   public var pauseDebounceDelay: TimeInterval = 0.5
-  /// Seconds between two reads of the server queue. On macOS, each focus of the window asks for one.
+  /// Seconds between two reads of the server queue when the scene becomes active. On macOS, each
+  /// focus of the window makes the scene active.
   public var minimumCheckInterval: TimeInterval = 30
 
   private let log = OSLog(subsystem: "Amperfy", category: "PlayQueueSyncer")
@@ -197,9 +198,10 @@ public class PlayQueueSyncer {
 
   /// Reads the server queue and posts `remotePlayQueueAvailable` if another client or another
   /// device saved a queue that this device did not see yet
-  public func checkRemoteQueue() async {
+  public func checkRemoteQueue(isIntervalIgnored: Bool = false) async {
     guard isActive, !player.isPlaying else { return }
-    if let lastCheckDate, Date().timeIntervalSince(lastCheckDate) < minimumCheckInterval { return }
+    if !isIntervalIgnored, let lastCheckDate,
+       Date().timeIntervalSince(lastCheckDate) < minimumCheckInterval { return }
     lastCheckDate = Date()
     let remote: RemotePlayQueue?
     do {

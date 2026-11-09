@@ -377,6 +377,15 @@ class PlayQueueSyncerTest: XCTestCase {
     XCTAssertEqual(offeredQueues.count, 0)
   }
 
+  func testCheck_WithinMinimumInterval_OnlyForegroundRequests() async {
+    syncer.minimumCheckInterval = 30
+    await syncer.checkRemoteQueue()
+    await syncer.checkRemoteQueue()
+    XCTAssertEqual(librarySyncer.remotePlayQueueRequestCount, 1)
+    await syncer.checkRemoteQueue(isIntervalIgnored: true)
+    XCTAssertEqual(librarySyncer.remotePlayQueueRequestCount, 2)
+  }
+
   func testCheck_WhilePlaying_DoesNotRequest() async {
     await startPlayback(context: PlayContext(name: "", index: 0, playables: Array(songs[0 ... 2])))
     librarySyncer.remotePlayQueue = makeRemote()
