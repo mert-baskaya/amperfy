@@ -197,6 +197,47 @@ class LyricsCueRangeTest: XCTestCase {
     XCTAssertEqual(cueLine.progress(at: 1000), LyricsCueProgress(cueIndex: 0, fraction: 1))
   }
 
+  private func emphasisCueLine() -> LyricsCueLine {
+    var cueLine = LyricsCueLine()
+    var short = cue("I ", 0, 1, start: 1000)
+    short.end = 1300
+    var held = cue("looove ", 2, 8, start: 1400)
+    held.end = 2600
+    var long = cue("everything", 9, 18, start: 3200)
+    long.end = 4500
+    cueLine.cues = [short, held, long, cue("oh", 20, 21, start: 5000)]
+    return cueLine
+  }
+
+  func testEmphasizedCueIsShortAndHeldLong() {
+    let cueLine = emphasisCueLine()
+    XCTAssertFalse(cueLine.isCueEmphasized(at: 0)) // not held
+    XCTAssertTrue(cueLine.isCueEmphasized(at: 1))
+    XCTAssertFalse(cueLine.isCueEmphasized(at: 2)) // too long
+    XCTAssertFalse(cueLine.isCueEmphasized(at: 3)) // no end
+    XCTAssertFalse(cueLine.isCueEmphasized(at: 4))
+  }
+
+  func testEmphasisRisesAndFalls() throws {
+    let cueLine = emphasisCueLine()
+    XCTAssertNil(cueLine.emphasis(at: 999))
+    XCTAssertNil(cueLine.emphasis(at: 1200))
+    XCTAssertNil(cueLine.emphasis(at: 1400))
+    let rising = try XCTUnwrap(cueLine.emphasis(at: 1550))
+    XCTAssertEqual(rising.cueIndex, 1)
+    XCTAssertEqual(rising.amount, 0.5, accuracy: 0.0001)
+    XCTAssertEqual(cueLine.emphasis(at: 2000), LyricsCueEmphasis(cueIndex: 1, amount: 1))
+    XCTAssertEqual(cueLine.emphasis(at: 2600), LyricsCueEmphasis(cueIndex: 1, amount: 1))
+    let falling = try XCTUnwrap(cueLine.emphasis(at: 2800))
+    XCTAssertEqual(falling.amount, 0.5, accuracy: 0.0001)
+    XCTAssertNil(cueLine.emphasis(at: 3000))
+    // the emphasis still falls while the next cue is sung
+    var next = cueLine
+    next.cues[2].start = 2700
+    XCTAssertEqual(try XCTUnwrap(next.emphasis(at: 2800)).cueIndex, 1)
+    XCTAssertNil(cueLine.emphasis(at: 4000))
+  }
+
   func testPlaybackClockRunsSmoothlyBetweenPlayerSteps() {
     var clock = LyricsPlaybackClock()
     XCTAssertEqual(clock.time(playerTime: 10.0, rate: 1, hostTime: 100.0), 10.0)

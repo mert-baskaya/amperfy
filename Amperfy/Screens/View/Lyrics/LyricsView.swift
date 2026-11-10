@@ -308,6 +308,7 @@ class LyricsView: UITableView, UITableViewDataSource, UITableViewDelegate {
          let lastIndexModel = lyricModels.object(at: lastIndex) {
         lastIndexModel.isActiveLine = false
         lastIndexModel.wordProgress = nil
+        lastIndexModel.wordEmphasis = nil
         reconfigureRows(at: [IndexPath(row: lastIndex, section: 0)])
       }
       lastIndex = nil
@@ -323,6 +324,7 @@ class LyricsView: UITableView, UITableViewDataSource, UITableViewDelegate {
       if lastIndex != indexOfCurrentLine {
         lastIndexModel.isActiveLine = false
         lastIndexModel.wordProgress = nil
+        lastIndexModel.wordEmphasis = nil
       }
       prevIndex = lastIndex
     }
@@ -333,6 +335,7 @@ class LyricsView: UITableView, UITableViewDataSource, UITableViewDelegate {
     }
     // only the mask of the sung words in the active line changes
     curIndexModel?.wordProgress = curIndexModel?.cueLine?.progress(at: lyricsTime)
+    curIndexModel?.wordEmphasis = curIndexModel?.cueLine?.emphasis(at: lyricsTime)
 
     if prevIndex != indexOfCurrentLine {
       if curIndexModel != nil {

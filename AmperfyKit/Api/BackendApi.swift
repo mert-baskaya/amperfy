@@ -199,6 +199,37 @@ public struct LyricsCueLine {
     return LyricsCueProgress(cueIndex: index, fraction: min(max(fraction, 0), 1))
   }
 
+  public static let emphasisMinDuration = 1_000
+  public static let emphasisMaxLength = 7
+  public static let emphasisAttack = 300
+  public static let emphasisRelease = 400
+
+  /// A short word that is held long is drawn with emphasis. The cue must give its own end:
+  /// the start of the next cue can include a pause.
+  public func isCueEmphasized(at index: Int) -> Bool {
+    guard let cue = cues.object(at: index), let end = cue.end else { return false }
+    let length = cue.value.trimmingCharacters(in: .whitespaces).count
+    return end - cue.start >= Self.emphasisMinDuration
+      && (1 ... Self.emphasisMaxLength).contains(length)
+  }
+
+  /// The emphasized cue at a lyrics time in milliseconds. The emphasis rises when the cue starts
+  /// and falls after its end.
+  public func emphasis(at time: Int) -> LyricsCueEmphasis? {
+    guard let activeIndex = activeCueIndex(at: time) else { return nil }
+    for index in (0 ... activeIndex).reversed() where isCueEmphasized(at: index) {
+      let cue = cues[index]
+      let end = cue.end ?? cue.start
+      let amount = time <= end
+        ? min(Double(time - cue.start) / Double(Self.emphasisAttack), 1)
+        : 1 - Double(time - end) / Double(Self.emphasisRelease)
+      if amount > 0 {
+        return LyricsCueEmphasis(cueIndex: index, amount: amount)
+      }
+    }
+    return nil
+  }
+
   /// The range of each cue in `text`, or nil if a cue cannot be found
   public func cueRanges(in text: String) -> [Range<String.Index>]? {
     var byteShift = 0
@@ -230,6 +261,18 @@ public struct LyricsCueProgress: Equatable, Sendable {
   public init(cueIndex: Int, fraction: Double) {
     self.cueIndex = cueIndex
     self.fraction = fraction
+  }
+}
+
+// MARK: - LyricsCueEmphasis
+
+public struct LyricsCueEmphasis: Equatable, Sendable {
+  public var cueIndex: Int
+  public var amount: Double // From 0 (no emphasis) to 1
+
+  public init(cueIndex: Int, amount: Double) {
+    self.cueIndex = cueIndex
+    self.amount = amount
   }
 }
 

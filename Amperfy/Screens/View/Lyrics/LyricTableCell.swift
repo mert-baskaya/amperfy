@@ -47,6 +47,14 @@ class LyricTableCellModel {
     }
   }
 
+  /// The held word of the active line that is drawn with emphasis
+  var wordEmphasis: LyricsCueEmphasis? {
+    didSet {
+      guard oldValue != wordEmphasis else { return }
+      cell?.refreshWordProgress()
+    }
+  }
+
   /// The cue line of the main agent, if its cues were found in the line text
   let cueLine: LyricsCueLine?
   /// The range (NSString) of each cue in the line text
@@ -146,6 +154,18 @@ class LyricTableCell: UITableViewCell {
   /// The active line in its full color, masked to the sung words
   private var sungLyricView: LyricTextView!
   private let sungMask = CAShapeLayer()
+  /// The emphasized word, lifted out of the line: its unsung text and, with a glow, its sung part
+  private let emphasisView = UIView()
+  private let emphasisGlowView = UIView()
+  private var emphasisUnsungView: LyricTextView!
+  private var emphasisSungView: LyricTextView!
+  private let emphasisUnsungMask = CAShapeLayer()
+  private let emphasisSungMask = CAShapeLayer()
+  /// Hides the emphasized word in the line
+  private let lyricMask = CAShapeLayer()
+  private static let emphasisScale = 0.06
+  private static let emphasisLift = 2.0
+  private static let emphasisGlowOpacity = 0.7
   override var layoutMargins: UIEdgeInsets { get { BasicTableCell.margin } set {} }
 
   static func adjustContainerWidthForMargins(containerWidth: CGFloat) -> CGFloat {
@@ -177,9 +197,24 @@ class LyricTableCell: UITableViewCell {
     sungLyricView.isHidden = true
     sungLyricView.isAccessibilityElement = false
     sungLyricView.layer.mask = sungMask
+    lyricMask.fillRule = .evenOdd
+    emphasisUnsungView = LyricTextView(frame: textFrame)
+    emphasisUnsungView.isAccessibilityElement = false
+    emphasisUnsungView.layer.mask = emphasisUnsungMask
+    emphasisSungView = LyricTextView(frame: textFrame)
+    emphasisSungView.isAccessibilityElement = false
+    emphasisSungView.layer.mask = emphasisSungMask
+    emphasisGlowView.layer.shadowOffset = .zero
+    emphasisGlowView.layer.shadowRadius = 6
+    emphasisGlowView.addSubview(emphasisSungView)
+    emphasisView.isUserInteractionEnabled = false
+    emphasisView.isHidden = true
+    emphasisView.addSubview(emphasisUnsungView)
+    emphasisView.addSubview(emphasisGlowView)
     selectionStyle = .none
     contentView.addSubview(lyricView)
     contentView.addSubview(sungLyricView)
+    contentView.addSubview(emphasisView)
     backgroundColor = .clear
   }
 
@@ -187,6 +222,13 @@ class LyricTableCell: UITableViewCell {
     super.layoutSubviews()
     lyricView.frame = textFrame
     sungLyricView.frame = textFrame
+    // the emphasis view has a transform: its frame must not be set
+    let textBounds = CGRect(origin: .zero, size: textFrame.size)
+    emphasisView.bounds = textBounds
+    emphasisView.center = CGPoint(x: textFrame.midX, y: textFrame.midY)
+    emphasisUnsungView.frame = textBounds
+    emphasisGlowView.frame = textBounds
+    emphasisSungView.frame = textBounds
     refreshWordProgress()
   }
 
@@ -206,12 +248,74 @@ class LyricTableCell: UITableViewCell {
 
   /// Moves the mask of the sung words. Called for each display frame while a line is sung.
   func refreshWordProgress() {
-    guard let model = viewModel, !sungLyricView.isHidden else { return }
+    guard let model = viewModel else { return }
     CATransaction.begin()
     CATransaction.setDisableActions(true)
+    defer { CATransaction.commit() }
+    let emphasis = sungLyricView.isHidden ? nil : model.wordEmphasis
+    let emphasizedRange = emphasis.flatMap { model.cueRanges.object(at: $0.cueIndex) }
+    refreshEmphasis(model: model, emphasis: emphasis, range: emphasizedRange)
+    guard !sungLyricView.isHidden else { return }
     sungMask.frame = sungLyricView.bounds
-    sungMask.path = sungLyricView.sungPath(cueRanges: model.cueRanges, progress: model.wordProgress)
-    CATransaction.commit()
+    sungMask.path = sungLyricView.sungPath(
+      cueRanges: model.cueRanges,
+      progress: model.wordProgress,
+      excludedCueIndex: emphasizedRange != nil ? emphasis?.cueIndex : nil
+    )
+  }
+
+  private func refreshEmphasis(
+    model: LyricTableCellModel,
+    emphasis: LyricsCueEmphasis?,
+    range: NSRange?
+  ) {
+    guard let emphasis, let range else {
+      if !emphasisView.isHidden {
+        emphasisView.isHidden = true
+        emphasisView.transform = .identity
+        emphasisUnsungView.attributedText = nil
+        emphasisSungView.attributedText = nil
+        lyricView.layer.mask = nil
+      }
+      return
+    }
+    emphasisUnsungView.attributedText = model.displayString
+    emphasisSungView.attributedText = model.sungString
+    emphasisView.isHidden = false
+
+    let wordRects = sungLyricView.rects(forCharacterRange: range)
+    let wordPath = CGMutablePath()
+    wordRects.forEach { wordPath.addRect($0) }
+    let linePath = CGMutablePath()
+    linePath.addRect(lyricView.bounds)
+    linePath.addPath(wordPath)
+    lyricMask.frame = lyricView.bounds
+    lyricMask.path = linePath
+    lyricView.layer.mask = lyricMask
+    emphasisUnsungMask.frame = emphasisUnsungView.bounds
+    emphasisUnsungMask.path = wordPath
+    let isSung = model.wordProgress?.cueIndex != emphasis.cueIndex
+    emphasisSungMask.frame = emphasisSungView.bounds
+    emphasisSungMask.path = sungLyricView.partialPath(
+      forCharacterRange: range,
+      fraction: isSung ? 1 : (model.wordProgress?.fraction ?? 1)
+    )
+
+    // ease in and out
+    let amount = emphasis.amount * emphasis.amount * (3 - 2 * emphasis.amount)
+    let wordRect = wordRects.reduce(CGRect.null) { $0.union($1) }
+    let dx = wordRect.midX - emphasisView.bounds.midX
+    let dy = wordRect.midY - emphasisView.bounds.midY
+    let scale = 1 + Self.emphasisScale * amount
+    // scale around the center of the word
+    emphasisView.transform = CGAffineTransform(
+      translationX: dx,
+      y: dy - Self.emphasisLift * amount
+    )
+    .scaledBy(x: scale, y: scale)
+    .translatedBy(x: -dx, y: -dy)
+    emphasisGlowView.layer.shadowColor = UIColor.label.resolvedColor(with: traitCollection).cgColor
+    emphasisGlowView.layer.shadowOpacity = Float(Self.emphasisGlowOpacity * amount)
   }
 }
 
@@ -270,28 +374,59 @@ class LyricTextView: UIView {
     layoutManager.drawGlyphs(forGlyphRange: glyphRange, at: textOrigin)
   }
 
-  /// The area of the sung text: the text before the active cue and the sung part of the active cue
-  func sungPath(cueRanges: [NSRange], progress: LyricsCueProgress?) -> CGPath {
+  /// The area of the sung text: the text before the active cue and the sung part of the active cue.
+  /// The excluded cue is left out, because it is drawn elsewhere.
+  func sungPath(
+    cueRanges: [NSRange],
+    progress: LyricsCueProgress?,
+    excludedCueIndex: Int? = nil
+  )
+    -> CGPath {
     updateTextLayoutIfNeeded()
     let path = CGMutablePath()
     guard let progress, let activeRange = cueRanges.object(at: progress.cueIndex) else {
       return path
     }
-    for rect in enclosingRects(forCharacterRange: NSRange(
-      location: 0,
-      length: activeRange.location
-    )) {
-      path.addRect(rect)
+    var sungRanges = [NSRange(location: 0, length: activeRange.location)]
+    if let excludedCueIndex, excludedCueIndex < progress.cueIndex,
+       let excluded = cueRanges.object(at: excludedCueIndex) {
+      sungRanges = [
+        NSRange(location: 0, length: excluded.location),
+        NSRange(
+          location: NSMaxRange(excluded),
+          length: max(activeRange.location - NSMaxRange(excluded), 0)
+        ),
+      ]
     }
-    let activeRects = enclosingRects(forCharacterRange: activeRange)
-    var sungWidth = activeRects.reduce(0) { $0 + $1.width } * progress.fraction
-    for rect in activeRects where sungWidth > 0 {
+    for range in sungRanges {
+      for rect in enclosingRects(forCharacterRange: range) {
+        path.addRect(rect)
+      }
+    }
+    if excludedCueIndex != progress.cueIndex {
+      path.addPath(partialPath(forCharacterRange: activeRange, fraction: progress.fraction))
+    }
+    return path
+  }
+
+  /// The area of the first part of the characters, in reading direction
+  func partialPath(forCharacterRange characterRange: NSRange, fraction: Double) -> CGPath {
+    let path = CGMutablePath()
+    let rects = rects(forCharacterRange: characterRange)
+    var sungWidth = rects.reduce(0) { $0 + $1.width } * fraction
+    for rect in rects where sungWidth > 0 {
       let width = min(rect.width, sungWidth)
       let x = isRightToLeft ? rect.maxX - width : rect.minX
       path.addRect(CGRect(x: x, y: rect.minY, width: width, height: rect.height))
       sungWidth -= width
     }
     return path
+  }
+
+  /// One rect for each line fragment that the characters cover
+  func rects(forCharacterRange characterRange: NSRange) -> [CGRect] {
+    updateTextLayoutIfNeeded()
+    return enclosingRects(forCharacterRange: characterRange)
   }
 
   private func updateTextLayoutIfNeeded() {
@@ -306,7 +441,6 @@ class LyricTextView: UIView {
     isTextLayoutValid = true
   }
 
-  /// One rect for each line fragment that the characters cover
   private func enclosingRects(forCharacterRange characterRange: NSRange) -> [CGRect] {
     guard characterRange.length > 0 else { return [] }
     let glyphRange = layoutManager.glyphRange(
