@@ -156,6 +156,8 @@ class LyricTableCell: UITableViewCell {
   private let sungMask = CAShapeLayer()
   /// The emphasized word, lifted out of the line: its unsung text and, with a glow, its sung part
   private let emphasisView = UIView()
+  /// A tight glow inside a wide halo
+  private let emphasisHaloView = UIView()
   private let emphasisGlowView = UIView()
   private var emphasisUnsungView: LyricTextView!
   private var emphasisSungView: LyricTextView!
@@ -165,7 +167,10 @@ class LyricTableCell: UITableViewCell {
   private let lyricMask = CAShapeLayer()
   private static let emphasisScale = 0.06
   private static let emphasisLift = 2.0
-  private static let emphasisGlowOpacity = 0.7
+  private static let emphasisGlowOpacity = 1.0
+  private static let emphasisHaloOpacity = 0.8
+  /// A dark glow on dark text smears the word: keep it faint in light mode
+  private static let emphasisLightModeGlowFactor = 0.3
   override var layoutMargins: UIEdgeInsets { get { BasicTableCell.margin } set {} }
 
   static func adjustContainerWidthForMargins(containerWidth: CGFloat) -> CGFloat {
@@ -205,12 +210,15 @@ class LyricTableCell: UITableViewCell {
     emphasisSungView.isAccessibilityElement = false
     emphasisSungView.layer.mask = emphasisSungMask
     emphasisGlowView.layer.shadowOffset = .zero
-    emphasisGlowView.layer.shadowRadius = 6
+    emphasisGlowView.layer.shadowRadius = 4
     emphasisGlowView.addSubview(emphasisSungView)
+    emphasisHaloView.layer.shadowOffset = .zero
+    emphasisHaloView.layer.shadowRadius = 12
+    emphasisHaloView.addSubview(emphasisGlowView)
     emphasisView.isUserInteractionEnabled = false
     emphasisView.isHidden = true
     emphasisView.addSubview(emphasisUnsungView)
-    emphasisView.addSubview(emphasisGlowView)
+    emphasisView.addSubview(emphasisHaloView)
     selectionStyle = .none
     contentView.addSubview(lyricView)
     contentView.addSubview(sungLyricView)
@@ -227,6 +235,7 @@ class LyricTableCell: UITableViewCell {
     emphasisView.bounds = textBounds
     emphasisView.center = CGPoint(x: textFrame.midX, y: textFrame.midY)
     emphasisUnsungView.frame = textBounds
+    emphasisHaloView.frame = textBounds
     emphasisGlowView.frame = textBounds
     emphasisSungView.frame = textBounds
     refreshWordProgress()
@@ -314,8 +323,13 @@ class LyricTableCell: UITableViewCell {
     )
     .scaledBy(x: scale, y: scale)
     .translatedBy(x: -dx, y: -dy)
-    emphasisGlowView.layer.shadowColor = UIColor.label.resolvedColor(with: traitCollection).cgColor
-    emphasisGlowView.layer.shadowOpacity = Float(Self.emphasisGlowOpacity * amount)
+    let glowColor = UIColor.label.resolvedColor(with: traitCollection).cgColor
+    let glowAmount = amount
+      * (traitCollection.userInterfaceStyle == .dark ? 1 : Self.emphasisLightModeGlowFactor)
+    emphasisGlowView.layer.shadowColor = glowColor
+    emphasisGlowView.layer.shadowOpacity = Float(Self.emphasisGlowOpacity * glowAmount)
+    emphasisHaloView.layer.shadowColor = glowColor
+    emphasisHaloView.layer.shadowOpacity = Float(Self.emphasisHaloOpacity * glowAmount)
   }
 }
 
