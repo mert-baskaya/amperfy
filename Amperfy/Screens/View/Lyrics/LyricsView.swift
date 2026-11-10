@@ -210,10 +210,16 @@ class LyricsView: UITableView, UITableViewDataSource, UITableViewDelegate {
 
     lastLineEnd = lyrics.lastLineEnd
     let isWordHighlight = isWordHighlightEnabled && lyrics.synced && !lyrics.cueLines.isEmpty
+    let isDuet = isWordHighlight && lyrics.isDuet
     var lineCountWithoutWordTiming = 0
     for (index, lyric) in lyrics.line.enumerated() {
       let cueLine = isWordHighlight ? lyrics.mainCueLine(forLine: index) : nil
-      let model = LyricTableCellModel(lyric: lyric, cueLine: cueLine)
+      let model = LyricTableCellModel(
+        lyric: lyric,
+        cueLine: cueLine,
+        backgroundCueLine: isWordHighlight ? lyrics.backgroundCueLine(forLine: index) : nil,
+        side: isDuet ? lyrics.side(forLine: index) : .center
+      )
       if cueLine != nil, model.cueLine == nil {
         lineCountWithoutWordTiming += 1
       }
@@ -309,6 +315,7 @@ class LyricsView: UITableView, UITableViewDataSource, UITableViewDelegate {
         lastIndexModel.isActiveLine = false
         lastIndexModel.wordProgress = nil
         lastIndexModel.wordEmphasis = nil
+        lastIndexModel.backgroundProgress = nil
         reconfigureRows(at: [IndexPath(row: lastIndex, section: 0)])
       }
       lastIndex = nil
@@ -325,6 +332,7 @@ class LyricsView: UITableView, UITableViewDataSource, UITableViewDelegate {
         lastIndexModel.isActiveLine = false
         lastIndexModel.wordProgress = nil
         lastIndexModel.wordEmphasis = nil
+        lastIndexModel.backgroundProgress = nil
       }
       prevIndex = lastIndex
     }
@@ -336,6 +344,7 @@ class LyricsView: UITableView, UITableViewDataSource, UITableViewDelegate {
     // only the mask of the sung words in the active line changes
     curIndexModel?.wordProgress = curIndexModel?.cueLine?.progress(at: lyricsTime)
     curIndexModel?.wordEmphasis = curIndexModel?.cueLine?.emphasis(at: lyricsTime)
+    curIndexModel?.backgroundProgress = curIndexModel?.backgroundCueLine?.progress(at: lyricsTime)
 
     if prevIndex != indexOfCurrentLine {
       if curIndexModel != nil {

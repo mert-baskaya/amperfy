@@ -55,16 +55,35 @@ class LyricTableCellModel {
     }
   }
 
+  /// The sung part of the background voice of the active line
+  var backgroundProgress: LyricsCueProgress? {
+    didSet {
+      guard oldValue != backgroundProgress else { return }
+      cell?.refreshWordProgress()
+    }
+  }
+
   /// The cue line of the main agent, if its cues were found in the line text
   let cueLine: LyricsCueLine?
   /// The range (NSString) of each cue in the line text
   let cueRanges: [NSRange]
+  /// The background voice of the line. Its text is drawn small, below the text of the main voice.
+  let backgroundCueLine: LyricsCueLine?
+  let backgroundCueRanges: [NSRange]
+  /// The side of the line in a duet
+  let side: LyricsLineSide
 
   private var attributedString: NSAttributedString?
   private var highlightedAttributedString: NSAttributedString?
   private var unsungAttributedString: NSAttributedString?
+  private var backgroundAttributedString: NSAttributedString?
+  private var backgroundSungAttributedString: NSAttributedString?
 
   internal weak var cell: LyricTableCell?
+
+  private static let backgroundSpacing: CGFloat = 2
+  /// A duet line leaves room on the other side
+  private static let duetWidthFactor: CGFloat = 0.85
 
   private var isWordHighlightActive: Bool {
     isActiveLine && cueLine != nil
@@ -80,21 +99,52 @@ class LyricTableCellModel {
     isWordHighlightActive ? highlightedAttributedString : nil
   }
 
-  init(lyric: LyricsLine, cueLine: LyricsCueLine? = nil) {
+  var backgroundDisplayString: NSAttributedString? {
+    backgroundAttributedString
+  }
+
+  /// Drawn over the background display string. Only the sung part of it is visible.
+  var backgroundSungString: NSAttributedString? {
+    isActiveLine ? backgroundSungAttributedString : nil
+  }
+
+  init(
+    lyric: LyricsLine,
+    cueLine: LyricsCueLine? = nil,
+    backgroundCueLine: LyricsCueLine? = nil,
+    side: LyricsLineSide = .center
+  ) {
     self.lyric = lyric
     self.isActiveLine = false
-    if let cueLine, let ranges = cueLine.cueRanges(in: lyric.value) {
+    self.side = side
+    var text = lyric.value
+    var backgroundText: String?
+    if let backgroundCueLine, let split = backgroundCueLine.splitBackground(of: lyric.value),
+       let ranges = backgroundCueLine.cueRanges(in: split.background) {
+      text = split.main
+      backgroundText = split.background
+      self.backgroundCueLine = backgroundCueLine
+      self.backgroundCueRanges = ranges.map { NSRange($0, in: split.background) }
+    } else {
+      self.backgroundCueLine = nil
+      self.backgroundCueRanges = []
+    }
+    if let cueLine, let ranges = cueLine.cueRanges(in: text) {
       self.cueLine = cueLine
-      self.cueRanges = ranges.map { NSRange($0, in: lyric.value) }
+      self.cueRanges = ranges.map { NSRange($0, in: text) }
     } else {
       self.cueLine = nil
       self.cueRanges = []
     }
     let paragraphStyle = NSMutableParagraphStyle()
-    paragraphStyle.alignment = .center
+    switch side {
+    case .center: paragraphStyle.alignment = .center
+    case .leading: paragraphStyle.alignment = .left
+    case .trailing: paragraphStyle.alignment = .right
+    }
     paragraphStyle.lineBreakMode = .byWordWrapping
     self.attributedString = NSAttributedString(
-      string: lyric.value,
+      string: text,
       attributes:
       [
         .font: UIFont.systemFont(ofSize: 20),
@@ -103,7 +153,7 @@ class LyricTableCellModel {
       ]
     )
     self.highlightedAttributedString = NSAttributedString(
-      string: lyric.value,
+      string: text,
       attributes:
       [
         .font: UIFont.boldSystemFont(ofSize: 20),
@@ -113,7 +163,7 @@ class LyricTableCellModel {
     )
     if self.cueLine != nil {
       self.unsungAttributedString = NSAttributedString(
-        string: lyric.value,
+        string: text,
         attributes:
         [
           .font: UIFont.boldSystemFont(ofSize: 20),
@@ -122,26 +172,59 @@ class LyricTableCellModel {
         ]
       )
     }
+    if let backgroundText {
+      // the same font for both states: the height of the background text does not change
+      let backgroundFont = UIFont.systemFont(ofSize: 15, weight: .medium)
+      self.backgroundAttributedString = NSAttributedString(
+        string: backgroundText,
+        attributes:
+        [
+          .font: backgroundFont,
+          .foregroundColor: UIColor.gray,
+          .paragraphStyle: paragraphStyle,
+        ]
+      )
+      self.backgroundSungAttributedString = NSAttributedString(
+        string: backgroundText,
+        attributes:
+        [
+          .font: backgroundFont,
+          .foregroundColor: UIColor.label.withAlphaComponent(0.8),
+          .paragraphStyle: paragraphStyle,
+        ]
+      )
+    }
+  }
+
+  /// The width of the text in a cell of the container width
+  func textWidth(containerWidth: CGFloat) -> CGFloat {
+    LyricTableCell.adjustContainerWidthForMargins(containerWidth: containerWidth)
+      * (side == .center ? 1 : Self.duetWidthFactor)
   }
 
   public func calcHeight(containerWidth: CGFloat) -> CGFloat {
-    let boundingSize = CGSize(
-      width: LyricTableCell.adjustContainerWidthForMargins(containerWidth: containerWidth),
-      height: 9_999
+    mainHeight(containerWidth: containerWidth) + backgroundHeight(containerWidth: containerWidth)
+  }
+
+  func mainHeight(containerWidth: CGFloat) -> CGFloat {
+    height(
+      of: isActiveLine ? highlightedAttributedString : attributedString,
+      containerWidth: containerWidth
     )
-    if isActiveLine {
-      return highlightedAttributedString?.boundingRect(
-        with: boundingSize,
-        options: .usesLineFragmentOrigin,
-        context: nil
-      ).height ?? 0
-    } else {
-      return attributedString?.boundingRect(
-        with: boundingSize,
-        options: .usesLineFragmentOrigin,
-        context: nil
-      ).height ?? 0
-    }
+  }
+
+  func backgroundHeight(containerWidth: CGFloat) -> CGFloat {
+    guard let backgroundAttributedString else { return 0 }
+    return ceil(height(of: backgroundAttributedString, containerWidth: containerWidth))
+      + Self.backgroundSpacing
+  }
+
+  private func height(of text: NSAttributedString?, containerWidth: CGFloat) -> CGFloat {
+    text?.boundingRect(
+      with: CGSize(width: textWidth(containerWidth: containerWidth), height: 9_999),
+      options: .usesLineFragmentOrigin,
+      context: nil
+    ).height ?? 0
   }
 }
 
@@ -154,6 +237,9 @@ class LyricTableCell: UITableViewCell {
   /// The active line in its full color, masked to the sung words
   private var sungLyricView: LyricTextView!
   private let sungMask = CAShapeLayer()
+  private var backgroundLyricView: LyricTextView!
+  private var backgroundSungLyricView: LyricTextView!
+  private let backgroundSungMask = CAShapeLayer()
   /// The emphasized word, lifted out of the line: its unsung text and, with a glow, its sung part
   private let emphasisView = UIView()
   /// A tight glow inside a wide halo
@@ -187,12 +273,32 @@ class LyricTableCell: UITableViewCell {
     commonInit()
   }
 
+  /// The frame of the main text. A duet line is on its side of the cell.
   private var textFrame: CGRect {
-    CGRect(
-      x: layoutMargins.left,
-      y: 0,
-      width: bounds.width - (2 * layoutMargins.right),
-      height: bounds.height
+    let availableWidth = bounds.width - (2 * layoutMargins.right)
+    let width = viewModel?.textWidth(containerWidth: bounds.width) ?? availableWidth
+    var x = layoutMargins.left
+    switch viewModel?.side ?? .center {
+    case .center: x += (availableWidth - width) / 2
+    case .leading: break
+    case .trailing: x += availableWidth - width
+    }
+    let backgroundHeight = viewModel?.backgroundHeight(containerWidth: bounds.width) ?? 0
+    return CGRect(x: x, y: 0, width: width, height: bounds.height - backgroundHeight)
+  }
+
+  /// The frame of the background text, directly below the main text
+  private var backgroundTextFrame: CGRect {
+    guard let model = viewModel else { return .zero }
+    let frame = textFrame
+    let backgroundHeight = model.backgroundHeight(containerWidth: bounds.width)
+    let mainHeight = model.mainHeight(containerWidth: bounds.width)
+    let padding = max((bounds.height - mainHeight - backgroundHeight) / 2, 0)
+    return CGRect(
+      x: frame.minX,
+      y: bounds.height - padding - backgroundHeight,
+      width: frame.width,
+      height: backgroundHeight
     )
   }
 
@@ -202,6 +308,12 @@ class LyricTableCell: UITableViewCell {
     sungLyricView.isHidden = true
     sungLyricView.isAccessibilityElement = false
     sungLyricView.layer.mask = sungMask
+    backgroundLyricView = LyricTextView(frame: .zero)
+    backgroundLyricView.isHidden = true
+    backgroundSungLyricView = LyricTextView(frame: .zero)
+    backgroundSungLyricView.isHidden = true
+    backgroundSungLyricView.isAccessibilityElement = false
+    backgroundSungLyricView.layer.mask = backgroundSungMask
     lyricMask.fillRule = .evenOdd
     emphasisUnsungView = LyricTextView(frame: textFrame)
     emphasisUnsungView.isAccessibilityElement = false
@@ -222,14 +334,23 @@ class LyricTableCell: UITableViewCell {
     selectionStyle = .none
     contentView.addSubview(lyricView)
     contentView.addSubview(sungLyricView)
+    contentView.addSubview(backgroundLyricView)
+    contentView.addSubview(backgroundSungLyricView)
     contentView.addSubview(emphasisView)
     backgroundColor = .clear
   }
 
   override func layoutSubviews() {
     super.layoutSubviews()
+    layoutTextViews()
+    refreshWordProgress()
+  }
+
+  private func layoutTextViews() {
     lyricView.frame = textFrame
     sungLyricView.frame = textFrame
+    backgroundLyricView.frame = backgroundTextFrame
+    backgroundSungLyricView.frame = backgroundTextFrame
     // the emphasis view has a transform: its frame must not be set
     let textBounds = CGRect(origin: .zero, size: textFrame.size)
     emphasisView.bounds = textBounds
@@ -238,12 +359,12 @@ class LyricTableCell: UITableViewCell {
     emphasisHaloView.frame = textBounds
     emphasisGlowView.frame = textBounds
     emphasisSungView.frame = textBounds
-    refreshWordProgress()
   }
 
   func display(model: LyricTableCellModel) {
     viewModel = model
     model.cell = self
+    layoutTextViews()
     refresh()
   }
 
@@ -252,6 +373,10 @@ class LyricTableCell: UITableViewCell {
     lyricView.attributedText = model.displayString
     sungLyricView.attributedText = model.sungString
     sungLyricView.isHidden = (model.sungString == nil)
+    backgroundLyricView.attributedText = model.backgroundDisplayString
+    backgroundLyricView.isHidden = (model.backgroundDisplayString == nil)
+    backgroundSungLyricView.attributedText = model.backgroundSungString
+    backgroundSungLyricView.isHidden = (model.backgroundSungString == nil)
     refreshWordProgress()
   }
 
@@ -264,6 +389,13 @@ class LyricTableCell: UITableViewCell {
     let emphasis = sungLyricView.isHidden ? nil : model.wordEmphasis
     let emphasizedRange = emphasis.flatMap { model.cueRanges.object(at: $0.cueIndex) }
     refreshEmphasis(model: model, emphasis: emphasis, range: emphasizedRange)
+    if !backgroundSungLyricView.isHidden {
+      backgroundSungMask.frame = backgroundSungLyricView.bounds
+      backgroundSungMask.path = backgroundSungLyricView.sungPath(
+        cueRanges: model.backgroundCueRanges,
+        progress: model.backgroundProgress
+      )
+    }
     guard !sungLyricView.isHidden else { return }
     sungMask.frame = sungLyricView.bounds
     sungMask.path = sungLyricView.sungPath(

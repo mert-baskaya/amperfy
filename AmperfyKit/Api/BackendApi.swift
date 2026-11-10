@@ -134,7 +134,39 @@ public struct StructuredLyrics {
 
   /// Several cue lines can refer to the same line, one for each agent. The main agent comes first.
   public func mainCueLine(forLine index: Int) -> LyricsCueLine? {
-    cueLines.first { $0.index == index }
+    cueLines.first { $0.index == index && !isBackground($0) }
+      ?? cueLines.first { $0.index == index }
+  }
+
+  /// The cue line of the background voice that sings with the main cue line of a line
+  public func backgroundCueLine(forLine index: Int) -> LyricsCueLine? {
+    guard let main = mainCueLine(forLine: index), !isBackground(main) else { return nil }
+    return cueLines.first { $0.index == index && isBackground($0) }
+  }
+
+  public func isBackground(_ cueLine: LyricsCueLine) -> Bool {
+    guard let agentId = cueLine.agentId else { return false }
+    return agents.first { $0.id == agentId }?.role == LyricsAgent.backgroundRole
+  }
+
+  /// The ids of the voices that sing a line, without the background voices, in the order of `agents`
+  private var voiceIds: [String] {
+    let sung = Set(cueLines.filter { !isBackground($0) }.compactMap { $0.agentId })
+    return agents.map { $0.id }.filter { sung.contains($0) }
+  }
+
+  /// True if at least two voices sing: the lines of each voice are then drawn on its own side
+  public var isDuet: Bool {
+    voiceIds.count >= 2
+  }
+
+  /// The side of a line in a duet. The first voice is on the leading side, a group is in the center.
+  public func side(forLine index: Int) -> LyricsLineSide {
+    guard let agentId = mainCueLine(forLine: index)?.agentId,
+          let agent = agents.first(where: { $0.id == agentId })
+    else { return .center }
+    if agent.role == LyricsAgent.groupRole { return .center }
+    return agentId == voiceIds.first ? .leading : .trailing
   }
 
   /// The end of the last line in milliseconds, if the lyrics give it
@@ -162,9 +194,20 @@ public struct StructuredLyrics {
   }
 }
 
+// MARK: - LyricsLineSide
+
+public enum LyricsLineSide: Sendable {
+  case center
+  case leading
+  case trailing
+}
+
 // MARK: - LyricsAgent
 
 public struct LyricsAgent {
+  public static let backgroundRole = "bg"
+  public static let groupRole = "group"
+
   public var id = "" // Unique in its lyrics entry
   public var role = "" // main, voice, bg or group
   public var name: String?
@@ -197,6 +240,17 @@ public struct LyricsCueLine {
     guard end > cue.start else { return LyricsCueProgress(cueIndex: index, fraction: 1) }
     let fraction = Double(time - cue.start) / Double(end - cue.start)
     return LyricsCueProgress(cueIndex: index, fraction: min(max(fraction, 0), 1))
+  }
+
+  /// Splits the text of a line into the text of the main voice and the text of this background
+  /// voice. Nil if the line does not hold both.
+  public func splitBackground(of lineText: String) -> (main: String, background: String)? {
+    guard !value.isEmpty, let range = lineText.range(of: value, options: .backwards) else {
+      return nil
+    }
+    let main = (lineText[..<range.lowerBound] + lineText[range.upperBound...])
+      .trimmingCharacters(in: .whitespaces)
+    return main.isEmpty ? nil : (main, value)
   }
 
   public static let emphasisMinDuration = 1_000

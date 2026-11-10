@@ -305,6 +305,74 @@ class LyricsCueRangeTest: XCTestCase {
     XCTAssertNil(lyrics.mainCueLine(forLine: 0))
   }
 
+  private func duetLyrics() -> StructuredLyrics {
+    func agent(_ id: String, _ role: String) -> LyricsAgent {
+      var agent = LyricsAgent()
+      agent.id = id
+      agent.role = role
+      return agent
+    }
+    func cueLine(_ index: Int, _ value: String, _ agentId: String) -> LyricsCueLine {
+      var cueLine = LyricsCueLine()
+      cueLine.index = index
+      cueLine.value = value
+      cueLine.agentId = agentId
+      return cueLine
+    }
+    var lyrics = StructuredLyrics()
+    lyrics.agents = [
+      agent("v1", "main"),
+      agent("v2", "voice"),
+      agent("__nd_bg__|v2", "bg"),
+      agent("v3", "group"),
+    ]
+    lyrics.cueLines = [
+      cueLine(0, "Hello there", "v1"),
+      cueLine(1, "I answer", "v2"),
+      cueLine(1, "(ooh yeah)", "__nd_bg__|v2"),
+      cueLine(2, "Together", "v3"),
+      cueLine(3, "(only echo)", "__nd_bg__|v2"),
+    ]
+    return lyrics
+  }
+
+  func testDuetSides() {
+    let lyrics = duetLyrics()
+    XCTAssertTrue(lyrics.isDuet)
+    XCTAssertEqual(lyrics.side(forLine: 0), .leading)
+    XCTAssertEqual(lyrics.side(forLine: 1), .trailing)
+    XCTAssertEqual(lyrics.side(forLine: 2), .center)
+    XCTAssertEqual(lyrics.side(forLine: 9), .center)
+  }
+
+  func testOneVoiceWithBackgroundIsNoDuet() {
+    var lyrics = duetLyrics()
+    lyrics.cueLines.removeAll { $0.agentId == "v2" || $0.agentId == "v3" }
+    XCTAssertFalse(lyrics.isDuet)
+    XCTAssertFalse(StructuredLyrics().isDuet)
+  }
+
+  func testBackgroundCueLine() {
+    let lyrics = duetLyrics()
+    XCTAssertEqual(lyrics.mainCueLine(forLine: 1)?.agentId, "v2")
+    XCTAssertEqual(lyrics.backgroundCueLine(forLine: 1)?.value, "(ooh yeah)")
+    XCTAssertNil(lyrics.backgroundCueLine(forLine: 0))
+    // a line of the background voice only: it is the main cue line
+    XCTAssertEqual(lyrics.mainCueLine(forLine: 3)?.value, "(only echo)")
+    XCTAssertNil(lyrics.backgroundCueLine(forLine: 3))
+  }
+
+  func testSplitBackground() throws {
+    var background = LyricsCueLine()
+    background.value = "(ooh yeah)"
+    let split = try XCTUnwrap(background.splitBackground(of: "I answer (ooh yeah)"))
+    XCTAssertEqual(split.main, "I answer")
+    XCTAssertEqual(split.background, "(ooh yeah)")
+    XCTAssertNil(background.splitBackground(of: "(ooh yeah)"))
+    XCTAssertNil(background.splitBackground(of: "I answer"))
+    XCTAssertNil(LyricsCueLine().splitBackground(of: "I answer"))
+  }
+
   func testOffsetApplied() {
     var lyrics = StructuredLyrics()
     var line = LyricsLine()
